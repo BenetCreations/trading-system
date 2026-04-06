@@ -55,17 +55,17 @@ export function EquityChart({ equityData }: EquityChartProps) {
           {
             label: 'Equity',
             data: equityData.map(p => p.equity),
-            borderColor: '#e94560',
+            borderColor: '#818cf8',
             borderWidth: 2,
             tension: 0.1,
             pointRadius: equityData.length > 50 ? 0 : 3,
-            pointBackgroundColor: '#e94560',
+            pointBackgroundColor: '#818cf8',
             fill: false,
           },
           {
             label: 'Starting Equity',
             data: equityData.map(() => startingEquity),
-            borderColor: '#a0a0b0',
+            borderColor: '#a1a1aa',
             borderWidth: 1,
             borderDash: [5, 5],
             tension: 0,
@@ -81,11 +81,11 @@ export function EquityChart({ equityData }: EquityChartProps) {
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: '#16213e',
-            borderColor: '#0f3460',
+            backgroundColor: '#1a1a1e',
+            borderColor: '#2e2e36',
             borderWidth: 1,
-            titleColor: '#a0a0b0',
-            bodyColor: '#e0e0e0',
+            titleColor: '#a1a1aa',
+            bodyColor: '#e4e4e7',
             callbacks: {
               label: (ctx: any) => {
                 if (ctx.datasetIndex === 1) return null;
@@ -100,17 +100,17 @@ export function EquityChart({ equityData }: EquityChartProps) {
         },
         scales: {
           x: {
-            ticks: { color: '#a0a0b0', maxTicksLimit: 10, maxRotation: 0 },
-            grid: { color: '#0f3460' },
-            border: { color: '#0f3460' },
+            ticks: { color: '#a1a1aa', maxTicksLimit: 10, maxRotation: 0 },
+            grid: { color: '#2e2e36' },
+            border: { color: '#2e2e36' },
           },
           y: {
             ticks: {
-              color: '#a0a0b0',
+              color: '#a1a1aa',
               callback: (v: number) => '$' + Math.round(v).toLocaleString(),
             },
-            grid: { color: '#0f3460' },
-            border: { color: '#0f3460' },
+            grid: { color: '#2e2e36' },
+            border: { color: '#2e2e36' },
           },
         },
       },

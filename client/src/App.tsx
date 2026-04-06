@@ -131,20 +131,29 @@ export default function App() {
       {/* Alert bar — always visible, between strip and tabs */}
       <AlertBar alerts={openMetrics.alerts} />
 
-      {/* Tab nav */}
+      {/* Tab nav — indicator grows from center, inset under label, spaced above content border */}
       <nav className="bg-[var(--color-bg-card)] px-6 flex gap-1 border-b border-[var(--color-accent)]">
         {TABS.map(tab => (
           <button
             key={tab}
+            type="button"
             onClick={() => setActiveTab(tab)}
             className={[
-              'px-4 py-2.5 text-sm font-medium transition-colors',
+              'relative px-4 pt-2.5 pb-3 text-sm font-medium transition-colors',
               activeTab === tab
-                ? 'text-[var(--color-highlight)] border-b-2 border-[var(--color-highlight)]'
+                ? 'text-[var(--color-highlight)]'
                 : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]',
             ].join(' ')}
           >
             {tab}
+            <span
+              aria-hidden
+              className={[
+                'pointer-events-none absolute left-2.5 right-2.5 bottom-2 h-0.5 rounded-full bg-[var(--color-highlight)] origin-center',
+                'transition-transform duration-300 ease-out',
+                activeTab === tab ? 'scale-x-100' : 'scale-x-0',
+              ].join(' ')}
+            />
           </button>
         ))}
       </nav>

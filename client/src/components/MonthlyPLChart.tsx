@@ -45,11 +45,11 @@ export function MonthlyPLChart({ monthlyData }: MonthlyPLChartProps) {
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: '#16213e',
-            borderColor: '#0f3460',
+            backgroundColor: '#1a1a1e',
+            borderColor: '#2e2e36',
             borderWidth: 1,
-            titleColor: '#a0a0b0',
-            bodyColor: '#e0e0e0',
+            titleColor: '#a1a1aa',
+            bodyColor: '#e4e4e7',
             callbacks: {
               label: (ctx: any) => {
                 const v = ctx.parsed.y;
@@ -60,17 +60,17 @@ export function MonthlyPLChart({ monthlyData }: MonthlyPLChartProps) {
         },
         scales: {
           x: {
-            ticks: { color: '#a0a0b0', maxRotation: 45 },
+            ticks: { color: '#a1a1aa', maxRotation: 45 },
             grid: { display: false },
-            border: { color: '#0f3460' },
+            border: { color: '#2e2e36' },
           },
           y: {
             ticks: {
-              color: '#a0a0b0',
+              color: '#a1a1aa',
               callback: (v: number) => (v >= 0 ? '$' : '-$') + Math.abs(Math.round(v)).toLocaleString(),
             },
-            grid: { color: '#0f3460' },
-            border: { color: '#0f3460' },
+            grid: { color: '#2e2e36' },
+            border: { color: '#2e2e36' },
           },
         },
       },

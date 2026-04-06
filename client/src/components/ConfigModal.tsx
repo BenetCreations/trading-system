@@ -250,7 +250,7 @@ export function ConfigModal({ config, onSave, onClose, onDataChange }: ConfigMod
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-1.5 text-xs bg-[var(--color-highlight)] text-[var(--color-bg-primary)] font-semibold rounded hover:opacity-90 disabled:opacity-50 transition-opacity"
+              className="px-4 py-1.5 text-xs bg-[var(--color-highlight)] text-white font-semibold rounded hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
               {saving ? 'Saving…' : 'Save'}
             </button>
