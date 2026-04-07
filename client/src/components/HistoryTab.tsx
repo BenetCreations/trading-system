@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, Fragment } from 'react';
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import { getEvaluations, getEvaluation, deleteEvaluation, bulkDeleteEvaluations } from '../api';
 import { EvaluationResult } from './EvaluationResult';
 import type { EvaluationListItem, EvaluationRecord } from '../types';
@@ -16,17 +16,22 @@ function formatDate(iso: string): string {
 }
 
 function recordToResult(record: EvaluationRecord): EvaluationResultType {
-  const rawStage = record.stage ? Number(record.stage) : null;
-  const likelyStage =
-    rawStage === 1 || rawStage === 2 || rawStage === 3 || rawStage === 4 ? rawStage : null;
+  const ps = record.prescreen_stage;
+  const likelyStage = ps === 1 || ps === 2 || ps === 3 || ps === 4 ? ps : null;
+  const conf = record.prescreen_confidence?.toLowerCase();
+  const confidence: 'high' | 'medium' | 'low' =
+    conf === 'high' || conf === 'medium' || conf === 'low' ? conf : 'medium';
   return {
     evaluation: record.evaluation_text,
     ticker: record.ticker,
     preScreen: {
       likelyStage,
-      confidence: 'medium',
-      reasoning: '',
+      confidence,
+      reasoning: record.prescreen_reasoning ?? '',
     },
+    stageFrom: record.stage_from,
+    stageTo: record.stage_to,
+    stageConfidence: record.stage_confidence,
     indicators: record.indicators_json ? JSON.parse(record.indicators_json) : null,
     filesLoaded: record.files_loaded ? record.files_loaded.split(',') : [],
     model: record.model ?? '',
@@ -36,35 +41,28 @@ function recordToResult(record: EvaluationRecord): EvaluationResultType {
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
 
-function StageBadge({ stage }: { stage: string | null }) {
-  const cfg: Record<string, string> = {
-    '1': 'bg-blue-900/40 text-blue-300 border-blue-700',
-    '2': 'bg-green-900/40 text-green-300 border-green-700',
-    '3': 'bg-amber-900/40 text-amber-300 border-amber-700',
-    '4': 'bg-red-900/40 text-red-300 border-red-700',
+function stageLabel(from: number | null, to: number | null): string {
+  if (from === null) return '—';
+  return to !== null ? `${from}→${to}` : String(from);
+}
+
+function StageBadge({ stageFrom, stageTo }: { stageFrom: number | null; stageTo: number | null }) {
+  const clsByStage: Record<number, string> = {
+    1: 'bg-blue-900/40 text-blue-300 border-blue-700',
+    2: 'bg-green-900/40 text-green-300 border-green-700',
+    3: 'bg-amber-900/40 text-amber-300 border-amber-700',
+    4: 'bg-red-900/40 text-red-300 border-red-700',
   };
-  if (!stage) return <span className="text-[var(--color-text-muted)]">—</span>;
-  const cls = cfg[stage] ?? 'bg-[var(--color-bg-primary)] text-[var(--color-text-muted)] border-[var(--color-accent)]';
+  if (stageFrom === null) return <span className="text-[var(--color-text-muted)]">—</span>;
+  const colorKey = stageTo ?? stageFrom;
+  const cls = clsByStage[colorKey] ?? 'bg-[var(--color-bg-primary)] text-[var(--color-text-muted)] border-[var(--color-accent)]';
   return (
     <span className={`inline-flex px-2 py-0.5 rounded-full border text-xs font-semibold ${cls}`}>
-      Stage {stage}
+      {stageLabel(stageFrom, stageTo)}
     </span>
   );
 }
 
-function VerdictBadge({ verdict }: { verdict: string | null }) {
-  if (!verdict) return <span className="text-[var(--color-text-muted)]">—</span>;
-  const v = verdict.toUpperCase();
-  let cls = 'bg-[var(--color-bg-primary)] text-[var(--color-text-muted)] border-[var(--color-accent)]';
-  if (v === 'QUALIFIES') cls = 'bg-green-900/30 text-green-300 border-green-700';
-  else if (v === 'DOES NOT QUALIFY') cls = 'bg-red-900/30 text-[var(--color-red)] border-red-700';
-  else if (v === 'WATCHLIST') cls = 'bg-amber-900/30 text-amber-300 border-amber-700';
-  return (
-    <span className={`inline-flex px-2 py-0.5 rounded-full border text-xs font-semibold ${cls}`}>
-      {verdict}
-    </span>
-  );
-}
 
 // ─── Expanded row ─────────────────────────────────────────────────────────────
 
@@ -91,7 +89,7 @@ function ExpandedRow({
   if (loading) {
     return (
       <tr>
-        <td colSpan={7} className="px-4 py-6 text-center text-sm text-[var(--color-text-muted)]">
+        <td colSpan={8} className="px-4 py-6 text-center text-sm text-[var(--color-text-muted)]">
           Loading…
         </td>
       </tr>
@@ -101,7 +99,7 @@ function ExpandedRow({
   if (error || !record) {
     return (
       <tr>
-        <td colSpan={7} className="px-4 py-4 text-center text-sm text-[var(--color-red)]">
+        <td colSpan={8} className="px-4 py-4 text-center text-sm text-[var(--color-red)]">
           Failed to load evaluation: {error}
         </td>
       </tr>
@@ -110,11 +108,60 @@ function ExpandedRow({
 
   return (
     <tr>
-      <td colSpan={7} className="px-4 py-4 bg-[var(--color-bg-primary)]/50 border-b border-[var(--color-accent)]">
+      <td colSpan={8} className="px-4 py-4 bg-[var(--color-bg-primary)]/50 border-b border-[var(--color-accent)]">
         <EvaluationResult result={recordToResult(record)} onClear={onCollapse} />
       </td>
     </tr>
   );
+}
+
+// ─── Sorting ──────────────────────────────────────────────────────────────────
+
+type SortKey = 'ticker' | 'timestamp' | 'stage' | 'stage_confidence' | 'verdict' | 'setup_type';
+type SortDir = 'asc' | 'desc';
+
+const VERDICT_ORDER: Record<string, number> = {
+  'QUALIFIES': 0,
+  'WATCHLIST': 1,
+  'DOES NOT QUALIFY': 2,
+};
+
+// Sort by destination stage first, pure stages before transitions, then by from-stage
+// e.g. ascending: 1, 2→1, 3→1, 4→1, 2, 1→2, 3→2, 4→2, 3, ...
+function stageKey(row: EvaluationListItem): number {
+  if (row.stage_from === null) return 99999;
+  const dest = row.stage_to ?? row.stage_from;   // destination stage (primary)
+  const isTransition = row.stage_to !== null ? 1 : 0; // pure stage sorts before transitions
+  const from = row.stage_from;                    // tiebreak within transitions
+  return dest * 1000 + isTransition * 100 + from;
+}
+
+interface SortEntry { key: SortKey; dir: SortDir; }
+
+function compareByKey(a: EvaluationListItem, b: EvaluationListItem, key: SortKey): number {
+  switch (key) {
+    case 'ticker':        return a.ticker.localeCompare(b.ticker);
+    case 'timestamp':     return a.timestamp < b.timestamp ? -1 : a.timestamp > b.timestamp ? 1 : 0;
+    case 'stage':         return stageKey(a) - stageKey(b);
+    case 'stage_confidence': return (a.stage_confidence ?? 'zzz').localeCompare(b.stage_confidence ?? 'zzz');
+    case 'verdict': {
+      const va = a.verdict ? (VERDICT_ORDER[a.verdict.toUpperCase()] ?? 3) : 4;
+      const vb = b.verdict ? (VERDICT_ORDER[b.verdict.toUpperCase()] ?? 3) : 4;
+      return va - vb;
+    }
+    case 'setup_type':    return (a.setup_type ?? 'zzz').localeCompare(b.setup_type ?? 'zzz');
+  }
+}
+
+function sortRows(rows: EvaluationListItem[], sorts: SortEntry[]): EvaluationListItem[] {
+  if (sorts.length === 0) return rows;
+  return [...rows].sort((a, b) => {
+    for (const { key, dir } of sorts) {
+      const cmp = compareByKey(a, b, key) * (dir === 'asc' ? 1 : -1);
+      if (cmp !== 0) return cmp;
+    }
+    return 0;
+  });
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -130,6 +177,36 @@ export function HistoryTab({ onRevaluate }: HistoryTabProps) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [sorts, setSorts] = useState<SortEntry[]>([{ key: 'timestamp', dir: 'desc' }]);
+
+  const sortedRows = useMemo(() => sortRows(rows, sorts), [rows, sorts]);
+
+  function handleSortClick(key: SortKey, shiftKey: boolean) {
+    setSorts(prev => {
+      const idx = prev.findIndex(s => s.key === key);
+      if (shiftKey) {
+        // Shift+click: toggle existing or append (max 3)
+        if (idx !== -1) {
+          if (prev[idx].dir === 'asc') {
+            return prev.map((s, i) => i === idx ? { ...s, dir: 'desc' as SortDir } : s);
+          } else {
+            // Remove this key from sorts
+            return prev.filter((_, i) => i !== idx);
+          }
+        }
+        const defaultDir: SortDir = key === 'timestamp' ? 'desc' : 'asc';
+        return [...prev.slice(0, 2), { key, dir: defaultDir }];
+      } else {
+        // Plain click: replace with single sort, toggle dir if same key
+        if (idx === 0 && prev.length === 1) {
+          return [{ key, dir: prev[0].dir === 'asc' ? 'desc' : 'asc' }];
+        }
+        const defaultDir: SortDir = key === 'timestamp' ? 'desc' : 'asc';
+        return [{ key, dir: defaultDir }];
+      }
+    });
+    setSelected(new Set());
+  }
 
   const load = useCallback(() => {
     setLoading(true);
@@ -144,14 +221,14 @@ export function HistoryTab({ onRevaluate }: HistoryTabProps) {
 
   // ── Selection ──
 
-  const allChecked = rows.length > 0 && selected.size === rows.length;
+  const allChecked = sortedRows.length > 0 && selected.size === sortedRows.length;
   const someChecked = selected.size > 0 && !allChecked;
 
   function toggleAll() {
     if (allChecked) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(rows.map(r => r.id)));
+      setSelected(new Set(sortedRows.map(r => r.id)));
     }
   }
 
@@ -232,7 +309,7 @@ export function HistoryTab({ onRevaluate }: HistoryTabProps) {
         </button>
         <button
           onClick={() => {
-            const tickers = rows
+            const tickers = sortedRows
               .filter(r => selected.has(r.id))
               .map(r => r.ticker);
             onRevaluate(tickers);
@@ -245,6 +322,9 @@ export function HistoryTab({ onRevaluate }: HistoryTabProps) {
       </div>
 
       {/* ── Table ── */}
+      <p className="text-xs text-[var(--color-text-muted)] mb-2 px-1">
+        Click a column to sort · Shift+click to add a secondary sort
+      </p>
       <div className="bg-[var(--color-bg-card)] border border-[var(--color-accent)] rounded-lg overflow-x-auto">
         {rows.length === 0 ? (
           <div className="p-8 text-center text-sm text-[var(--color-text-muted)]">
@@ -264,16 +344,32 @@ export function HistoryTab({ onRevaluate }: HistoryTabProps) {
                     onClick={e => e.stopPropagation()}
                   />
                 </th>
-                <th className="px-3 py-2 text-left">Ticker</th>
-                <th className="px-3 py-2 text-left">Date / Time</th>
-                <th className="px-3 py-2 text-left">Stage</th>
-                <th className="px-3 py-2 text-left">Verdict</th>
-                <th className="px-3 py-2 text-left">Setup Type</th>
+                {([ ['ticker','Ticker'], ['timestamp','Date / Time'], ['stage','Stage'],
+                    ['stage_confidence','Confidence'], ['verdict','Verdict'], ['setup_type','Setup Type'],
+                ] as [SortKey, string][]).map(([key, label]) => {
+                  const sortIdx = sorts.findIndex(s => s.key === key);
+                  const active = sorts[sortIdx];
+                  return (
+                    <th
+                      key={key}
+                      className="px-3 py-2 text-left cursor-pointer select-none hover:text-[var(--color-text)] transition-colors"
+                      onClick={e => handleSortClick(key, e.shiftKey)}
+                    >
+                      {label}
+                      {active && (
+                        <span className="ml-1 opacity-60">
+                          {active.dir === 'asc' ? '↑' : '↓'}
+                          {sorts.length > 1 && <sup>{sortIdx + 1}</sup>}
+                        </span>
+                      )}
+                    </th>
+                  );
+                })}
                 <th className="px-3 py-2 text-left w-8"></th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, i) => (
+              {sortedRows.map((row, i) => (
                 <Fragment key={row.id}>
                   <tr
                     onClick={() => handleRowClick(row.id)}
@@ -296,16 +392,19 @@ export function HistoryTab({ onRevaluate }: HistoryTabProps) {
                     <td className="px-3 py-2.5 font-semibold text-[var(--color-text)] font-mono tracking-wide">
                       {row.ticker}
                     </td>
-                    <td className="px-3 py-2.5 text-[var(--color-text-muted)] font-mono text-xs">
+                    <td className="px-3 py-2.5 text-xs text-[var(--color-text-muted)]">
                       {formatDate(row.timestamp)}
                     </td>
                     <td className="px-3 py-2.5">
-                      <StageBadge stage={row.stage} />
+                      <StageBadge stageFrom={row.stage_from} stageTo={row.stage_to} />
                     </td>
-                    <td className="px-3 py-2.5">
-                      <VerdictBadge verdict={row.verdict} />
+                    <td className="px-3 py-2.5 text-xs text-[var(--color-text-muted)]">
+                      {row.stage_confidence ?? '—'}
                     </td>
-                    <td className="px-3 py-2.5 text-[var(--color-text-muted)]">
+                    <td className="px-3 py-2.5 text-xs font-medium text-[var(--color-text-muted)]">
+                      {row.verdict ?? '—'}
+                    </td>
+                    <td className="px-3 py-2.5 text-xs text-[var(--color-text-muted)]">
                       {row.setup_type ?? '—'}
                     </td>
                     <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>

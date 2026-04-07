@@ -62,6 +62,37 @@ db.exec(`
   );
 `);
 
+// ─── Migrations ───────────────────────────────────────────────────────────────
+try { db.exec(`ALTER TABLE evaluations ADD COLUMN stage_confidence       TEXT`);    } catch (_) { /* already exists */ }
+try { db.exec(`ALTER TABLE evaluations ADD COLUMN stage_from            INTEGER`); } catch (_) { /* already exists */ }
+try { db.exec(`ALTER TABLE evaluations ADD COLUMN stage_to              INTEGER`); } catch (_) { /* already exists */ }
+try { db.exec(`ALTER TABLE evaluations ADD COLUMN prescreen_stage       INTEGER`); } catch (_) { /* already exists */ }
+try { db.exec(`ALTER TABLE evaluations ADD COLUMN prescreen_confidence  TEXT`);    } catch (_) { /* already exists */ }
+try { db.exec(`ALTER TABLE evaluations ADD COLUMN prescreen_reasoning   TEXT`);    } catch (_) { /* already exists */ }
+
+// Migrate legacy `stage` strings ("Stage 1", "Stage 1-2", "1", "1-2") → stage_from / stage_to
+db.exec(`
+  UPDATE evaluations
+  SET
+    stage_from = CAST(
+      CASE
+        WHEN stage GLOB 'Stage [1-4]-[1-4]' THEN substr(stage, 7, 1)
+        WHEN stage GLOB '[1-4]-[1-4]'        THEN substr(stage, 1, 1)
+        WHEN stage GLOB 'Stage [1-4]*'       THEN substr(stage, 7, 1)
+        WHEN stage GLOB '[1-4]'              THEN stage
+        ELSE NULL
+      END AS INTEGER
+    ),
+    stage_to = CAST(
+      CASE
+        WHEN stage GLOB 'Stage [1-4]-[1-4]' THEN substr(stage, 9, 1)
+        WHEN stage GLOB '[1-4]-[1-4]'        THEN substr(stage, 3, 1)
+        ELSE NULL
+      END AS INTEGER
+    )
+  WHERE stage IS NOT NULL AND stage_from IS NULL;
+`);
+
 const configCount = (db.prepare('SELECT COUNT(*) as count FROM config').get() as { count: number }).count;
 if (configCount === 0) {
   const insert = db.prepare('INSERT INTO config (key, value) VALUES (?, ?)');

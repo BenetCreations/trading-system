@@ -28,6 +28,36 @@ function extractSetupType(text: string): string | null {
   return match ? match[1].trim() : null;
 }
 
+interface ExtractedStage {
+  stageFrom: number | null;
+  stageTo: number | null;
+  confidence: string | null;
+}
+
+function extractStage(text: string): ExtractedStage {
+  const stripped = text.replace(/\*\*/g, '');
+  const match = stripped.match(/^STAGE:\s*(.+)$/im);
+  if (!match) return { stageFrom: null, stageTo: null, confidence: null };
+
+  const s = match[1].trim();
+
+  // Confidence
+  const confMatch = s.match(/Confidence:\s*(High|Medium|Low)/i);
+  const confidence = confMatch
+    ? confMatch[1].charAt(0).toUpperCase() + confMatch[1].slice(1).toLowerCase()
+    : null;
+
+  // Transition: 1→2, 2→3, 1/2, 1-2, etc.
+  const transMatch = s.match(/\b([1-4])\s*[→\/\-]\s*([1-4])\b/);
+  if (transMatch) {
+    return { stageFrom: Number(transMatch[1]), stageTo: Number(transMatch[2]), confidence };
+  }
+
+  // Single stage
+  const numMatch = s.match(/\b([1-4])\b/);
+  return { stageFrom: numMatch ? Number(numMatch[1]) : null, stageTo: null, confidence };
+}
+
 // ─── Build user message ───────────────────────────────────────────────────────
 
 function buildUserMessage(
@@ -203,16 +233,25 @@ ${'─'.repeat(80)}
 
     const timestamp = new Date().toISOString();
 
+    const { stageFrom, stageTo, confidence: stageConfidence } = extractStage(claudeText);
+
     let savedId: number | null = null;
     try {
       const insertResult = db.prepare(`
         INSERT INTO evaluations
-          (ticker, timestamp, stage, verdict, setup_type, evaluation_text, indicators_json, files_loaded, model, request_type, enrichment_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (ticker, timestamp, stage_from, stage_to, stage_confidence,
+           prescreen_stage, prescreen_confidence, prescreen_reasoning,
+           verdict, setup_type, evaluation_text, indicators_json, files_loaded, model, request_type, enrichment_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         ticker,
         timestamp,
-        preScreen.likelyStage !== null ? String(preScreen.likelyStage) : null,
+        stageFrom,
+        stageTo,
+        stageConfidence,
+        preScreen.likelyStage,
+        preScreen.confidence,
+        preScreen.reasoning,
         extractVerdict(claudeText),
         extractSetupType(claudeText),
         claudeText,
@@ -232,6 +271,9 @@ ${'─'.repeat(80)}
       evaluation: claudeText,
       ticker,
       preScreen,
+      stageFrom,
+      stageTo,
+      stageConfidence,
       indicators: indicators,
       filesLoaded,
       model: MODEL,

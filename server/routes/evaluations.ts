@@ -9,8 +9,9 @@ const router = Router();
 router.get('/evaluations', (_req: Request, res: Response) => {
   try {
     const rows = db.prepare(`
-      SELECT id, ticker, timestamp, stage, verdict, setup_type,
-             files_loaded, model, request_type, enrichment_json
+      SELECT id, ticker, timestamp, stage_from, stage_to, stage_confidence,
+             prescreen_stage, prescreen_confidence, prescreen_reasoning,
+             verdict, setup_type, files_loaded, model, request_type, enrichment_json
       FROM evaluations
       ORDER BY timestamp DESC
     `).all() as Omit<EvaluationRecord, 'evaluation_text' | 'indicators_json'>[];

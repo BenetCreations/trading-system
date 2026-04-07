@@ -127,20 +127,21 @@ function parseEvaluation(rawText: string): ParsedEvaluation {
 
 // ─── Small shared primitives ──────────────────────────────────────────────────
 
-function StageBadge({ stage, confidence }: { stage: 1 | 2 | 3 | 4 | null; confidence: string }) {
-  const cfg: Record<string, { label: string; cls: string }> = {
-    '1': { label: 'Stage 1', cls: 'bg-blue-900/40 text-blue-300 border-blue-700' },
-    '2': { label: 'Stage 2', cls: 'bg-green-900/40 text-green-300 border-green-700' },
-    '3': { label: 'Stage 3', cls: 'bg-amber-900/40 text-amber-300 border-amber-700' },
-    '4': { label: 'Stage 4', cls: 'bg-red-900/40 text-red-300 border-red-700' },
-    'null': { label: 'Ambiguous', cls: 'bg-[var(--color-bg-primary)] text-[var(--color-text-muted)] border-[var(--color-accent)]' },
+function StageBadge({ stageFrom, stageTo, confidence }: { stageFrom: number | null; stageTo: number | null; confidence?: string | null }) {
+  const clsByStage: Record<number, string> = {
+    1: 'bg-blue-900/40 text-blue-300 border-blue-700',
+    2: 'bg-green-900/40 text-green-300 border-green-700',
+    3: 'bg-amber-900/40 text-amber-300 border-amber-700',
+    4: 'bg-red-900/40 text-red-300 border-red-700',
   };
-  const k = stage === null ? 'null' : String(stage);
-  const { label, cls } = cfg[k] ?? cfg['null'];
+  if (stageFrom === null) return null;
+  const colorKey = stageTo ?? stageFrom;
+  const cls = clsByStage[colorKey] ?? 'bg-[var(--color-bg-primary)] text-[var(--color-text-muted)] border-[var(--color-accent)]';
+  const label = stageTo !== null ? `${stageFrom}→${stageTo}` : String(stageFrom);
   return (
     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-semibold ${cls}`}>
       {label}
-      <span className="opacity-60 font-normal">· {confidence}</span>
+      {confidence && <span className="opacity-60 font-normal">· {confidence}</span>}
     </span>
   );
 }
@@ -582,14 +583,24 @@ export function EvaluationResult({ result, onClear }: EvaluationResultProps) {
 
       {/* ── Header ── */}
       <Card className="flex flex-wrap items-start justify-between gap-6">
-        {/* Left — ticker + prescreen */}
+        {/* Left — ticker + Claude stage + prescreen */}
         <div className="min-w-0">
           <div className="flex items-center gap-3 mb-3">
             <h1 className="text-3xl font-bold tracking-tight text-[var(--color-text)]">{result.ticker}</h1>
-            <StageBadge stage={result.preScreen.likelyStage} confidence={result.preScreen.confidence} />
+            <StageBadge
+              stageFrom={result.stageFrom ?? null}
+              stageTo={result.stageTo ?? null}
+              confidence={result.stageConfidence}
+            />
           </div>
-          <p className="text-xs italic text-[var(--color-text-muted)] mb-0.5 tracking-wide">Prescreen</p>
-          <p className="text-sm text-[var(--color-text-muted)] leading-snug">{result.preScreen.reasoning}</p>
+          {result.preScreen.reasoning && (
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-xs italic text-[var(--color-text-muted)] tracking-wide shrink-0">
+                Prescreen{result.preScreen.likelyStage !== null ? ` Stage ${result.preScreen.likelyStage}` : ''} · {result.preScreen.confidence}
+              </span>
+              <span className="text-xs text-[var(--color-text-muted)] leading-snug">{result.preScreen.reasoning}</span>
+            </div>
+          )}
         </div>
 
         {/* Right — meta */}

@@ -110,6 +110,9 @@ export interface EvaluationResult {
     confidence: 'high' | 'medium' | 'low';
     reasoning: string;
   };
+  stageFrom?: number | null;
+  stageTo?: number | null;
+  stageConfidence?: string | null;
   indicators: unknown;
   filesLoaded: string[];
   model: string;

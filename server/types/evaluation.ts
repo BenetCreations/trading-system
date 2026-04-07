@@ -33,6 +33,9 @@ export interface EvaluationResponse {
     confidence: 'high' | 'medium' | 'low';
     reasoning: string;
   };
+  stageFrom: number | null;
+  stageTo: number | null;
+  stageConfidence: string | null;
   indicators: unknown;
   filesLoaded: string[];
   model: string;
@@ -44,7 +47,12 @@ export interface EvaluationRecord {
   id: number;
   ticker: string;
   timestamp: string;
-  stage: string | null;
+  stage_from: number | null;
+  stage_to: number | null;
+  stage_confidence: string | null;
+  prescreen_stage: number | null;
+  prescreen_confidence: string | null;
+  prescreen_reasoning: string | null;
   verdict: string | null;
   setup_type: string | null;
   evaluation_text: string;
