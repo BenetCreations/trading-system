@@ -8,6 +8,7 @@ import dataRouter from './routes/data.js';
 import marketDataRouter from './routes/market-data.js';
 import evaluateRouter from './routes/evaluate.js';
 import evaluationsRouter from './routes/evaluations.js';
+import backtestRouter from './routes/backtest.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -24,6 +25,7 @@ app.use('/api', dataRouter);
 app.use('/api', marketDataRouter);
 app.use('/api', evaluateRouter);
 app.use('/api', evaluationsRouter);
+app.use('/api/backtest', backtestRouter);
 
 const clientDist = path.join(__dirname, '../dist/client');
 app.use(express.static(clientDist));

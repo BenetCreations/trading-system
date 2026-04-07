@@ -42,6 +42,7 @@ export interface Position {
   tier: 0 | 1 | 2 | 3;
   earningsDate?: string;
   notes: string;
+  atrSellThreshold?: number | null;
 }
 
 export interface AppConfig {

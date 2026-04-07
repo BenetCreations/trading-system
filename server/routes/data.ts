@@ -39,6 +39,7 @@ interface PositionRow {
   tier: number;
   earnings_date: string | null;
   notes: string;
+  atr_sell_threshold: number | null;
 }
 
 interface ConfigRow {
@@ -89,6 +90,7 @@ function positionFromRow(row: PositionRow): Position {
     tier: row.tier as Position['tier'],
     earningsDate: row.earnings_date ?? undefined,
     notes: row.notes,
+    atrSellThreshold: row.atr_sell_threshold ?? null,
   };
 }
 
@@ -120,6 +122,7 @@ const POSITION_CAMEL_TO_SNAKE: Record<string, string> = {
   tier: 'tier',
   earningsDate: 'earnings_date',
   notes: 'notes',
+  atrSellThreshold: 'atr_sell_threshold',
 };
 
 function configRowsToObject(rows: ConfigRow[]): AppConfig {

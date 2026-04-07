@@ -1,8 +1,13 @@
-import { useState } from 'react';
-import type { Position } from '../types';
+import { useState, useReducer, useEffect } from 'react';
+import type { Position, Trade } from '../types';
 import type { OpenMetrics } from '../utils/metrics';
 import { fmt, fmtD, fmtP, pctColor } from '../utils/formatters';
 import { StatCard } from './StatCard';
+import { SETUP_TYPES } from '../utils/constants';
+import { subscribeATR, getATRState } from '../services/atrStore';
+import type { ATRResult } from '../api';
+
+type CreateTrade = Omit<Trade, 'id' | 'riskPerShare' | 'rMultiple' | 'dollarPL' | 'percentGain'>;
 
 interface PositionTableProps {
   positions: Position[];
@@ -10,6 +15,160 @@ interface PositionTableProps {
   onDelete: (id: string) => Promise<void>;
   onUpdate: (id: string, updates: Partial<Position>) => Promise<void>;
   onRefreshPrices: () => Promise<{ failed: string[] }>;
+  onClose: (positionId: string, trade: CreateTrade) => Promise<void>;
+  currentRegime: 1 | 2;
+}
+
+// ─── Close Position Modal ────────────────────────────────────────────────────
+
+function inputClass(extra = '') {
+  return `bg-[var(--color-bg-primary)] border border-[var(--color-accent)] rounded px-2 py-1.5 text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-highlight)] w-full ${extra}`;
+}
+
+function labelClass() {
+  return 'block text-xs text-[var(--color-text-muted)] mb-1 uppercase tracking-wide';
+}
+
+function CloseModal({
+  position,
+  currentRegime,
+  onConfirm,
+  onCancel,
+}: {
+  position: Position;
+  currentRegime: 1 | 2;
+  onConfirm: (trade: CreateTrade) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [exitPrice, setExitPrice] = useState(String(position.currentPrice));
+  const [exitDate, setExitDate] = useState(today);
+  const [setupType, setSetupType] = useState(position.setupType as Trade['setupType']);
+  const [notes, setNotes] = useState(position.notes);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const ep = parseFloat(exitPrice);
+  const riskPerShare = position.entryPrice - position.stopPrice;
+  const rMultiple = riskPerShare !== 0 && !isNaN(ep) ? (ep - position.entryPrice) / riskPerShare : null;
+  const dollarPL = !isNaN(ep) ? (ep - position.entryPrice) * position.shares : null;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (isNaN(ep) || ep <= 0) { setError('Valid exit price required'); return; }
+    const trade: CreateTrade = {
+      ticker: position.ticker,
+      setupType,
+      tier: position.tier,
+      entryDate: position.entryDate,
+      exitDate,
+      entryPrice: position.entryPrice,
+      stopPrice: position.stopPrice,
+      exitPrice: ep,
+      shares: position.shares,
+      regime: currentRegime,
+      notes: notes.trim(),
+    };
+    setSubmitting(true);
+    try {
+      await onConfirm(trade);
+    } catch (err) {
+      setError((err as Error).message);
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onCancel}>
+      <form
+        onSubmit={handleSubmit}
+        className="bg-[var(--color-bg-card)] border border-[var(--color-accent)] rounded-lg p-5 w-full max-w-md mx-4 shadow-xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-[var(--color-text)] uppercase tracking-wide">
+            Close {position.ticker}
+          </h2>
+          <button type="button" onClick={onCancel} className="text-[var(--color-text-muted)] hover:text-[var(--color-text)] text-xl leading-none">×</button>
+        </div>
+
+        {/* Position summary */}
+        <div className="bg-[var(--color-bg-primary)] rounded p-3 mb-4 grid grid-cols-3 gap-2 text-xs text-center">
+          <div>
+            <div className="text-[var(--color-text-muted)] mb-0.5">Entry</div>
+            <div className="font-mono">${fmt(position.entryPrice)}</div>
+          </div>
+          <div>
+            <div className="text-[var(--color-text-muted)] mb-0.5">Stop</div>
+            <div className="font-mono text-[var(--color-text-muted)]">${fmt(position.stopPrice)}</div>
+          </div>
+          <div>
+            <div className="text-[var(--color-text-muted)] mb-0.5">Shares</div>
+            <div className="font-mono">{position.shares.toLocaleString()}</div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label className={labelClass()}>Exit Price</label>
+            <input type="number" step="0.01" className={inputClass()} value={exitPrice} onChange={e => setExitPrice(e.target.value)} autoFocus />
+          </div>
+          <div>
+            <label className={labelClass()}>Exit Date</label>
+            <input type="date" className={inputClass()} value={exitDate} onChange={e => setExitDate(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="mb-3">
+          <label className={labelClass()}>Setup Type</label>
+          <select className={inputClass()} value={setupType} onChange={e => setSetupType(e.target.value as Trade['setupType'])}>
+            {SETUP_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+
+        <div className="mb-3">
+          <label className={labelClass()}>Notes</label>
+          <input className={inputClass()} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional" />
+        </div>
+
+        {/* Live P&L preview */}
+        {dollarPL !== null && (
+          <div className="bg-[var(--color-bg-primary)] rounded p-3 mb-3 grid grid-cols-2 gap-3 text-xs text-center">
+            <div>
+              <div className="text-[var(--color-text-muted)] mb-0.5">R-Multiple</div>
+              <div className={`font-mono font-semibold ${rMultiple !== null ? pctColor(rMultiple) : ''}`}>
+                {rMultiple !== null ? `${fmt(rMultiple)}R` : '—'}
+              </div>
+            </div>
+            <div>
+              <div className="text-[var(--color-text-muted)] mb-0.5">Dollar P&L</div>
+              <div className={`font-mono font-semibold ${pctColor(dollarPL)}`}>{fmtD(dollarPL)}</div>
+            </div>
+          </div>
+        )}
+
+        {error && <div className="text-[var(--color-red)] text-xs mb-2">{error}</div>}
+
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            disabled={submitting}
+            className="flex-1 bg-[var(--color-highlight)] text-white text-sm font-medium px-4 py-2 rounded hover:opacity-90 disabled:opacity-50 transition-opacity"
+          >
+            {submitting ? 'Closing…' : 'Close & Log Trade'}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 text-sm rounded border border-[var(--color-accent)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  );
 }
 
 function capStatus(pct: number, cap: number): { label: string; colorClass: string } {
@@ -18,11 +177,22 @@ function capStatus(pct: number, cap: number): { label: string; colorClass: strin
   return { label: '', colorClass: '' };
 }
 
-export function PositionTable({ positions, openMetrics, onDelete, onRefreshPrices }: PositionTableProps) {
+function atrMultColor(mult: number, threshold: number): string {
+  if (mult >= threshold) return '#ef4444';
+  if (mult >= threshold * 0.75) return '#f59e0b';
+  return '#10b981';
+}
+
+export function PositionTable({ positions, openMetrics, onDelete, onRefreshPrices, onClose, currentRegime }: PositionTableProps) {
   const om = openMetrics;
+  const [, forceUpdate] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => subscribeATR(forceUpdate), []);
+  const { results: atrResults } = getATRState();
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [failedTickers, setFailedTickers] = useState<string[]>([]);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [closingPosition, setClosingPosition] = useState<Position | null>(null);
 
   const handleRefreshPrices = async () => {
     setIsRefreshing(true);
@@ -83,6 +253,7 @@ export function PositionTable({ positions, openMetrics, onDelete, onRefreshPrice
                 <th className="px-3 py-2 text-center">Tier</th>
                 <th className="px-3 py-2 text-left">Earnings</th>
                 <th className="px-3 py-2 text-right">Unreal. P&L</th>
+                <th className="px-3 py-2 text-right">ATR Mult</th>
                 <th className="px-3 py-2"></th>
               </tr>
             </thead>
@@ -106,14 +277,35 @@ export function PositionTable({ positions, openMetrics, onDelete, onRefreshPrice
                     <td className="px-3 py-2 text-center text-[var(--color-text-muted)]">{p.tier}</td>
                     <td className="px-3 py-2 text-[var(--color-text-muted)] text-xs">{p.earningsDate ?? '—'}</td>
                     <td className={`px-3 py-2 text-right font-mono ${pctColor(unrealizedPL)}`}>{fmtD(unrealizedPL)}</td>
+                    <td className="px-3 py-2 text-right font-mono">
+                      {(() => {
+                        const atr = atrResults.find((r: ATRResult) => r.ticker === p.ticker);
+                        if (!atr) return <span className="text-[var(--color-text-muted)]">—</span>;
+                        const threshold = p.atrSellThreshold ?? 7;
+                        return (
+                          <span style={{ color: atrMultColor(atr.atrMult, threshold) }}>
+                            {fmt(atr.atrMult)}×
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="px-3 py-2">
-                      <button
-                        onClick={() => onDelete(p.id)}
-                        className="text-[var(--color-text-muted)] hover:text-[var(--color-red)] text-xs transition-colors"
-                        title="Delete position"
-                      >
-                        ×
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setClosingPosition(p)}
+                          className="text-xs px-2 py-0.5 rounded border border-[var(--color-highlight)] text-[var(--color-highlight)] hover:bg-[var(--color-highlight)] hover:text-white transition-colors"
+                          title="Close position and log trade"
+                        >
+                          Close
+                        </button>
+                        <button
+                          onClick={() => onDelete(p.id)}
+                          className="text-[var(--color-text-muted)] hover:text-[var(--color-red)] text-xs transition-colors"
+                          title="Delete position"
+                        >
+                          ×
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -187,6 +379,18 @@ export function PositionTable({ positions, openMetrics, onDelete, onRefreshPrice
             </div>
           )}
         </div>
+      )}
+
+      {closingPosition && (
+        <CloseModal
+          position={closingPosition}
+          currentRegime={currentRegime}
+          onConfirm={async (trade) => {
+            await onClose(closingPosition.id, trade);
+            setClosingPosition(null);
+          }}
+          onCancel={() => setClosingPosition(null)}
+        />
       )}
     </div>
   );

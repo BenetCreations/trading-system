@@ -1,4 +1,4 @@
-import { useState, useEffect, useReducer, useMemo } from 'react';
+import { useState, useEffect, useReducer, useMemo, useRef } from 'react';
 import { useTrades } from './hooks/useTrades';
 import { usePositions } from './hooks/usePositions';
 import { useEvaluation } from './hooks/useEvaluation';
@@ -10,12 +10,16 @@ import {
 import {
   startQueue, resetQueue, subscribeQueue, getQueueState,
 } from './services/queueRunner';
+import { startATRFetch } from './services/atrStore';
 import { SummaryStrip } from './components/SummaryStrip';
 import { AlertBar } from './components/AlertBar';
 import { ConfigModal } from './components/ConfigModal';
 import { TradeForm } from './components/TradeForm';
 import { TradeTable } from './components/TradeTable';
 import { PositionTable } from './components/PositionTable';
+import { PositionForm } from './components/PositionForm';
+import { ATRPanel } from './components/ATRPanel';
+import { ATRBacktest } from './components/ATRBacktest';
 import { EquityChart } from './components/EquityChart';
 import { MonthlyPLChart } from './components/MonthlyPLChart';
 import { KellyPanel } from './components/KellyPanel';
@@ -31,7 +35,7 @@ function useQueueStatus() {
   return getQueueState().status;
 }
 
-const TABS = ['Trades', 'Positions', 'Equity', 'Kelly', 'Regime', 'Screen', 'History'] as const;
+const TABS = ['Trades', 'Positions', 'ATR', 'Equity', 'Kelly', 'Regime', 'Screen', 'History'] as const;
 type Tab = typeof TABS[number];
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -75,6 +79,28 @@ export default function App() {
     currentTicker: evalTicker,
     evaluate, cancel: cancelEval, clear: clearEval,
   } = useEvaluation();
+
+  const handleSaveThreshold = async (ticker: string, threshold: number) => {
+    const affected = positions.filter((p: { ticker: string }) => p.ticker === ticker);
+    for (const p of affected) {
+      await updatePosition(p.id, { atrSellThreshold: threshold });
+    }
+    await refreshPositions();
+  };
+
+  const atrStarted = useRef(false);
+  useEffect(() => {
+    if (!positionsLoading && positions.length > 0 && !atrStarted.current) {
+      atrStarted.current = true;
+      startATRFetch([...new Set(positions.map((p: { ticker: string }) => p.ticker))]);
+    }
+  }, [positionsLoading, positions]);
+
+  const handleClosePosition = async (positionId: string, trade: Parameters<typeof addTrade>[0]) => {
+    await addTrade(trade);
+    await removePosition(positionId);
+    await refreshTrades();
+  };
 
   const queueStatus = useQueueStatus();
 
@@ -179,13 +205,32 @@ export default function App() {
         )}
 
         {activeTab === 'Positions' && (
-          <PositionTable
-            positions={positions}
-            openMetrics={openMetrics}
-            onDelete={removePosition}
-            onUpdate={updatePosition}
-            onRefreshPrices={refreshPrices}
-          />
+          <>
+            <PositionForm onAdd={addPosition} />
+            <PositionTable
+              positions={positions}
+              openMetrics={openMetrics}
+              onDelete={removePosition}
+              onUpdate={updatePosition}
+              onRefreshPrices={refreshPrices}
+              onClose={handleClosePosition}
+              currentRegime={config.currentRegime as 1 | 2}
+            />
+          </>
+        )}
+
+        {activeTab === 'ATR' && (
+          <div className="space-y-6">
+            <ATRPanel
+              positions={positions}
+              onRefresh={() => startATRFetch([...new Set(positions.map((p: { ticker: string }) => p.ticker))])}
+              onSaveThreshold={handleSaveThreshold}
+            />
+            <ATRBacktest
+              positions={positions}
+              onSaveThreshold={handleSaveThreshold}
+            />
+          </div>
         )}
 
         {activeTab === 'Equity' && (

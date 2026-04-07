@@ -135,6 +135,93 @@ export function bulkDeleteEvaluations(ids: number[]): Promise<void> {
   return apiFetch('/evaluations/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) });
 }
 
+// ─── ATR Extension ───────────────────────────────────────────────────────────
+
+export interface ATRResult {
+  ticker: string;
+  currentPrice: number;
+  ema21: number;
+  atr: number;
+  atrPct: number;
+  extPct: number;
+  atrMult: number;
+  band: { label: string; color: string };
+}
+
+export function getATR(ticker: string): Promise<ATRResult> {
+  return apiFetch(`/atr/${encodeURIComponent(ticker)}`);
+}
+
+// ─── ATR Backtest ─────────────────────────────────────────────────────────────
+
+export interface ATRPeak {
+  date: string;
+  price: number;
+  mult: number;
+}
+
+export interface ATRBucket {
+  label: string;
+  min: number;
+  max: number;
+  count: number;
+}
+
+export interface ATRBacktestResult {
+  peaks: ATRPeak[];
+  stats: {
+    count: number;
+    max: number;
+    avg: number;
+    median: number;
+    maxPeak: ATRPeak | null;
+    above7count: number;
+    above7pct: number;
+  };
+  buckets: ATRBucket[];
+  tradingDaysAnalyzed: number;
+}
+
+export function runATRBacktest(params: {
+  ticker: string;
+  startDate: string;
+  endDate: string;
+  resetThreshold: number;
+}): Promise<ATRBacktestResult> {
+  return apiFetch('/backtest/atr', { method: 'POST', body: JSON.stringify(params) });
+}
+
+export interface AtrBacktestHistoryListItem {
+  id: number;
+  ticker: string;
+  startDate: string;
+  endDate: string;
+  resetThreshold: number;
+  ranAt: string;
+  peakCount: number;
+  maxMult: number;
+  avgMult: number;
+  medianMult: number;
+  above7Count: number;
+  above7Pct: number;
+}
+
+export interface AtrBacktestHistoryRecord extends AtrBacktestHistoryListItem {
+  results: ATRBacktestResult;
+}
+
+export function getATRBacktestHistory(): Promise<AtrBacktestHistoryListItem[]> {
+  return apiFetch('/backtest/atr/history');
+}
+
+export function getATRBacktestHistoryEntry(id: number): Promise<AtrBacktestHistoryRecord> {
+  return apiFetch(`/backtest/atr/history/${id}`);
+}
+
+export function deleteATRBacktestHistoryEntry(id: number): Promise<{ success: boolean }> {
+  return apiFetch(`/backtest/atr/history/${id}`, { method: 'DELETE' });
+}
+
 // ─── Export / Import ─────────────────────────────────────────────────────────
 
 function triggerDownload(blob: Blob, filename: string): void {

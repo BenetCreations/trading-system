@@ -60,9 +60,26 @@ db.exec(`
     request_type     TEXT,
     enrichment_json  TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS atr_backtest_history (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker          TEXT NOT NULL,
+    start_date      TEXT NOT NULL,
+    end_date        TEXT NOT NULL,
+    reset_threshold REAL NOT NULL,
+    ran_at          TEXT NOT NULL,
+    peak_count      INTEGER NOT NULL,
+    max_mult        REAL NOT NULL,
+    avg_mult        REAL NOT NULL,
+    median_mult     REAL NOT NULL,
+    above7_count    INTEGER NOT NULL,
+    above7_pct      REAL NOT NULL,
+    results_json    TEXT NOT NULL
+  );
 `);
 
 // ─── Migrations ───────────────────────────────────────────────────────────────
+try { db.exec(`ALTER TABLE positions   ADD COLUMN atr_sell_threshold   REAL`);      } catch (_) { /* already exists */ }
 try { db.exec(`ALTER TABLE evaluations ADD COLUMN stage_confidence       TEXT`);    } catch (_) { /* already exists */ }
 try { db.exec(`ALTER TABLE evaluations ADD COLUMN stage_from            INTEGER`); } catch (_) { /* already exists */ }
 try { db.exec(`ALTER TABLE evaluations ADD COLUMN stage_to              INTEGER`); } catch (_) { /* already exists */ }

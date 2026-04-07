@@ -72,12 +72,12 @@ async function polygonFetchWithRetry(url: string, attempt = 1): Promise<Response
   }
 }
 
-export async function fetchPolygonCandles(ticker: string): Promise<CandleSeries> {
+export async function fetchPolygonCandles(ticker: string, fromOverride?: string, toOverride?: string): Promise<CandleSeries> {
   // Request 3 years back — free tier returns ~2 years (~500 trading days) regardless
-  const to = toDateStr(new Date());
+  const to = toOverride ?? toDateStr(new Date());
   const fromDate = new Date();
   fromDate.setFullYear(fromDate.getFullYear() - 3);
-  const from = toDateStr(fromDate);
+  const from = fromOverride ?? toDateStr(fromDate);
 
   const url = `${POLYGON_BASE}/${ticker}/range/1/day/${from}/${to}?adjusted=true&sort=asc&limit=700&apiKey=${POLYGON_API_KEY}`;
   const redacted = url.replace(POLYGON_API_KEY, '[REDACTED]');
