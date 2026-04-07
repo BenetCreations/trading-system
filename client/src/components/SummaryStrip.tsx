@@ -8,10 +8,12 @@ interface SummaryStripProps {
   positions: Position[];
   config: AppConfig;
   openMetrics: OpenMetrics;
+  /** Count of danger + warning alerts (may exclude session-dismissed min-size warnings). */
+  alertCount: number;
   onOpenConfig: () => void;
 }
 
-export function SummaryStrip({ trades, positions, config, openMetrics, onOpenConfig }: SummaryStripProps) {
+export function SummaryStrip({ trades, positions, config, openMetrics, alertCount, onOpenConfig }: SummaryStripProps) {
   const equityPoints = calcEquity(trades, config.startingEquity);
   const last = equityPoints[equityPoints.length - 1];
   const currentEquity = last?.equity ?? config.startingEquity;
@@ -20,8 +22,6 @@ export function SummaryStrip({ trades, positions, config, openMetrics, onOpenCon
   const winRate = trades.length
     ? (trades.filter(t => t.rMultiple > 0).length / trades.length) * 100
     : null;
-  const alertCount = openMetrics.alerts.filter(a => a.severity === 'danger' || a.severity === 'warning').length;
-
   return (
     <div className="sticky top-0 z-10 bg-[var(--color-bg-card)] border-b border-[var(--color-accent)] px-6 py-2 flex flex-wrap gap-x-6 gap-y-1 items-center text-sm">
       <Item label="Equity" value={fmtD(currentEquity)} />
@@ -57,9 +57,9 @@ export function SummaryStrip({ trades, positions, config, openMetrics, onOpenCon
       )}
       <Item label="Regime" value={String(config.currentRegime)} />
       {alertCount > 0 && (
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-[var(--color-text-muted)] uppercase tracking-wide">Alerts</span>
-          <span className="bg-[var(--color-red)] text-white text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-xs text-[var(--color-text-muted)] uppercase tracking-wide">Alerts:</span>
+          <span className="font-mono text-sm font-bold text-amber-300 tabular-nums leading-none">
             {alertCount}
           </span>
         </div>

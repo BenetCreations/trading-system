@@ -3,6 +3,7 @@ import { getEvaluations, getEvaluation, deleteEvaluation, bulkDeleteEvaluations 
 import { EvaluationResult } from './EvaluationResult';
 import type { EvaluationListItem, EvaluationRecord } from '../types';
 import type { EvaluationResult as EvaluationResultType } from '../api';
+import { buttonLavender, buttonBw } from '../utils/buttonStyles';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -177,6 +178,7 @@ export function HistoryTab({ onRevaluate }: HistoryTabProps) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [bulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false);
   const [sorts, setSorts] = useState<SortEntry[]>([{ key: 'timestamp', dir: 'desc' }]);
 
   const sortedRows = useMemo(() => sortRows(rows, sorts), [rows, sorts]);
@@ -256,13 +258,15 @@ export function HistoryTab({ onRevaluate }: HistoryTabProps) {
 
   // ── Bulk delete ──
 
-  async function handleBulkDelete() {
+  async function confirmBulkDelete() {
     const ids = Array.from(selected);
-    if (!confirm(`Delete ${ids.length} evaluation${ids.length === 1 ? '' : 's'}?`)) return;
+    if (ids.length === 0) return;
     setDeleting(true);
     try {
       await bulkDeleteEvaluations(ids);
       if (expandedId !== null && selected.has(expandedId)) setExpandedId(null);
+      setSelected(new Set());
+      setBulkDeleteModalOpen(false);
       load();
     } catch (err) {
       alert(`Bulk delete failed: ${(err as Error).message}`);
@@ -301,9 +305,10 @@ export function HistoryTab({ onRevaluate }: HistoryTabProps) {
       {/* ── Action bar ── */}
       <div className="flex gap-2 mb-4">
         <button
-          onClick={handleBulkDelete}
+          type="button"
+          onClick={() => selected.size > 0 && !deleting && setBulkDeleteModalOpen(true)}
           disabled={selected.size === 0 || deleting}
-          className="px-4 py-2 text-sm rounded border transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-[var(--color-bg-card)] border-[var(--color-red)]/60 text-[var(--color-red)] hover:bg-red-900/20 disabled:hover:bg-[var(--color-bg-card)]"
+          className={`px-4 py-2 text-sm rounded ${buttonBw} hover:!border-[var(--color-red)] hover:!text-[var(--color-red)] hover:bg-[var(--color-red)]/10 disabled:!opacity-40 disabled:hover:!border-[var(--color-accent)] disabled:hover:!text-[var(--color-text)] disabled:hover:bg-[var(--color-bg-card)]`}
         >
           Delete Selected{selected.size > 0 ? ` (${selected.size})` : ''}
         </button>
@@ -315,13 +320,52 @@ export function HistoryTab({ onRevaluate }: HistoryTabProps) {
             onRevaluate(tickers);
           }}
           disabled={selected.size === 0}
-          className="px-4 py-2 text-sm rounded border transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-[var(--color-bg-card)] border-[var(--color-accent)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-text-muted)] disabled:hover:border-[var(--color-accent)] disabled:hover:text-[var(--color-text-muted)]"
+          className={`px-4 py-2 text-sm rounded ${buttonLavender}`}
         >
           Re-evaluate Selected{selected.size > 0 ? ` (${selected.size})` : ''}
         </button>
       </div>
 
       {/* ── Table ── */}
+      {bulkDeleteModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => !deleting && setBulkDeleteModalOpen(false)}
+        >
+          <div
+            className="bg-[var(--color-bg-card)] border border-[var(--color-accent)] rounded-lg p-5 w-full max-w-sm mx-4 shadow-xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-sm font-semibold text-[var(--color-text)] uppercase tracking-wide mb-2">
+              Delete selected evaluations
+            </h2>
+            <p className="text-sm text-[var(--color-text-muted)] mb-4">
+              Permanently delete{' '}
+              <span className="font-semibold text-[var(--color-text)]">{selected.size}</span>{' '}
+              evaluation{selected.size === 1 ? '' : 's'}? This cannot be undone.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setBulkDeleteModalOpen(false)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm rounded border border-[var(--color-accent)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmBulkDelete()}
+                disabled={deleting}
+                className="px-4 py-2 text-sm rounded bg-[var(--color-red)]/90 text-white hover:bg-[var(--color-red)] disabled:opacity-50 transition-colors"
+              >
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <p className="text-xs text-[var(--color-text-muted)] mb-2 px-1">
         Click a column to sort · Shift+click to add a secondary sort
       </p>
@@ -340,7 +384,7 @@ export function HistoryTab({ onRevaluate }: HistoryTabProps) {
                     checked={allChecked}
                     ref={el => { if (el) el.indeterminate = someChecked; }}
                     onChange={toggleAll}
-                    className="accent-[var(--color-highlight)] cursor-pointer"
+                    className="history-checkbox"
                     onClick={e => e.stopPropagation()}
                   />
                 </th>
@@ -386,7 +430,7 @@ export function HistoryTab({ onRevaluate }: HistoryTabProps) {
                         type="checkbox"
                         checked={selected.has(row.id)}
                         onChange={() => toggleRow(row.id)}
-                        className="accent-[var(--color-highlight)] cursor-pointer"
+                        className="history-checkbox"
                       />
                     </td>
                     <td className="px-3 py-2.5 font-semibold text-[var(--color-text)] font-mono tracking-wide">

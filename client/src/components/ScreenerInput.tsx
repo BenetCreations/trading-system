@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react';
 import type { EvaluationEnrichment } from '../api';
+import { buttonLavender } from '../utils/buttonStyles';
 
 interface ScreenerInputProps {
   onEvaluate: (ticker: string, options?: { enrichment?: EvaluationEnrichment }) => void;
@@ -100,7 +101,7 @@ export function ScreenerInput({ onEvaluate, onBatchEvaluate, onCancel, loading, 
             <button
               type="submit"
               disabled={loading || tickers.length === 0}
-              className="px-6 py-3 bg-[var(--color-highlight)] text-white text-sm font-semibold rounded-lg hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity flex items-center gap-2 whitespace-nowrap"
+              className={`px-6 py-3 text-sm font-semibold rounded-lg flex items-center gap-2 whitespace-nowrap ${buttonLavender}`}
             >
               {loading ? (
                 <>

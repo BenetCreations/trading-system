@@ -15,3 +15,47 @@ body {
   background-color: var(--color-bg-primary);
   color: var(--color-text);
 }
+
+/* History tab: muted unchecked checkbox; checked / indeterminate match highlight accent */
+.history-checkbox {
+  appearance: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--color-accent);
+  /* Midway between first pass (accent+muted) and the brighter muted+white mix */
+  background-color: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--color-accent) 72%, var(--color-text-muted) 28%) 50%,
+    color-mix(in srgb, var(--color-text-muted) 48%, white 52%) 50%
+  );
+  cursor: pointer;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.history-checkbox:focus {
+  outline: none;
+}
+
+.history-checkbox:focus-visible {
+  box-shadow: 0 0 0 2px rgb(129 140 248 / 0.35);
+}
+
+.history-checkbox:checked {
+  border-color: var(--color-highlight);
+  background-color: var(--color-highlight);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' d='M5 13l4 4L19 7'/%3E%3C/svg%3E");
+  background-size: 0.65em 0.65em;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.history-checkbox:indeterminate {
+  border-color: var(--color-highlight);
+  background-color: var(--color-highlight);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' d='M6 12h12'/%3E%3C/svg%3E");
+  background-size: 0.7em 0.35em;
+  background-position: center;
+  background-repeat: no-repeat;
+}

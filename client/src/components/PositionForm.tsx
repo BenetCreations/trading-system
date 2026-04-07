@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Position } from '../types';
 import { SETUP_TYPES, TIERS, SECTORS } from '../utils/constants';
+import { buttonLavender } from '../utils/buttonStyles';
 
 type CreatePosition = Omit<Position, 'id'>;
 
@@ -85,7 +86,7 @@ export function PositionForm({ onAdd }: PositionFormProps) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="mb-3 px-3 py-1.5 text-xs rounded border transition-colors bg-[var(--color-bg-card)] border-[var(--color-highlight)] text-[var(--color-highlight)] hover:bg-[var(--color-highlight)] hover:text-white"
+        className={`mb-3 px-3 py-1.5 text-xs rounded ${buttonLavender}`}
       >
         + Add Position
       </button>

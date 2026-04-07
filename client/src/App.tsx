@@ -127,6 +127,26 @@ export default function App() {
     [positions, currentEquity, config.currentRegime],
   );
 
+  const [suppressMinSizeAlerts, setSuppressMinSizeAlerts] = useState(false);
+
+  const hasMinSizeAlert = useMemo(
+    () => openMetrics.alerts.some(a => a.type === 'min-size'),
+    [openMetrics.alerts],
+  );
+
+  useEffect(() => {
+    if (!hasMinSizeAlert) setSuppressMinSizeAlerts(false);
+  }, [hasMinSizeAlert]);
+
+  const summaryAlertCount = useMemo(() => {
+    const dangerOrWarn = openMetrics.alerts.filter(
+      a => a.severity === 'danger' || a.severity === 'warning',
+    );
+    if (!suppressMinSizeAlerts) return dangerOrWarn.length;
+    const minSizeN = openMetrics.alerts.filter(a => a.type === 'min-size').length;
+    return Math.max(0, dangerOrWarn.length - minSizeN);
+  }, [openMetrics.alerts, suppressMinSizeAlerts]);
+
   return (
     <div className="min-h-screen bg-[var(--color-bg-primary)] text-[var(--color-text)]">
       {/* Title bar */}
@@ -141,6 +161,7 @@ export default function App() {
         positions={positions}
         config={config}
         openMetrics={openMetrics}
+        alertCount={summaryAlertCount}
         onOpenConfig={() => setConfigModalOpen(true)}
       />
 
@@ -155,7 +176,11 @@ export default function App() {
       )}
 
       {/* Alert bar — always visible, between strip and tabs */}
-      <AlertBar alerts={openMetrics.alerts} />
+      <AlertBar
+        alerts={openMetrics.alerts}
+        suppressMinSizeAlerts={suppressMinSizeAlerts}
+        onDismissMinSizeAlerts={() => setSuppressMinSizeAlerts(true)}
+      />
 
       {/* Tab nav — indicator grows from center, inset under label, spaced above content border */}
       <nav className="bg-[var(--color-bg-card)] px-6 flex gap-1 border-b border-[var(--color-accent)]">

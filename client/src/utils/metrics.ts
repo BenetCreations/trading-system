@@ -296,7 +296,7 @@ export function calcOpenMetrics(
       alerts.push({ type: 'single-name', severity: 'warning', message: `${p.ticker} single-name exposure exceeds 25%` });
     }
     if (namePct > 0 && namePct < 0.05) {
-      alerts.push({ type: 'min-size', severity: 'info', message: `${p.ticker} below 5% minimum position threshold — consider closing` });
+      alerts.push({ type: 'min-size', severity: 'warning', message: `${p.ticker} below 5% minimum position threshold — consider closing` });
     }
 
     if (p.earningsDate) {

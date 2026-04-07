@@ -3,6 +3,7 @@ import {
   runATRBacktest, getATRBacktestHistory, getATRBacktestHistoryEntry, deleteATRBacktestHistoryEntry,
 } from '../api';
 import type { ATRBacktestResult, ATRBucket, AtrBacktestHistoryListItem, AtrBacktestHistoryRecord } from '../api';
+import { buttonLavender } from '../utils/buttonStyles';
 import type { Position } from '../types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -363,7 +364,7 @@ export function ATRBacktest({ positions, onSaveThreshold }: ATRBacktestProps) {
           <button
             onClick={handleRun}
             disabled={loading || !ticker.trim()}
-            className="px-4 py-1.5 text-sm rounded border transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-[var(--color-highlight)]/10 border-[var(--color-highlight)] text-[var(--color-highlight)] hover:bg-[var(--color-highlight)]/20"
+            className={`px-4 py-1.5 text-sm rounded ${buttonLavender}`}
           >
             {loading ? 'Running…' : 'Run Backtest'}
           </button>
