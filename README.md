@@ -14,6 +14,19 @@ Enter a ticker — the app pulls market data, calculates technical indicators (M
 
 ---
 
+## Screenshots
+
+### Trades Tab — Log closed trades, track R-multiples and P&L
+![Trades Tab](screenshots/trades-tab.jpeg)
+
+### ATR Tab — ATR extensions, sell thresholds, and backtest
+![ATR Tab](screenshots/atr-tab.jpeg)
+
+### History Tab — Full evaluation history with stage, verdict, and setup type
+![History Tab](screenshots/history-tab.jpeg)
+
+---
+
 ## Tech Stack
 
 | Layer | Tools |
